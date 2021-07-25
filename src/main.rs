@@ -1,6 +1,9 @@
 #![feature(available_concurrency)]
+#![feature(vec_spare_capacity)]
+#![feature(maybe_uninit_extra)]
 
 mod simple;
+mod better;
 
 trait TestTask {
     const PARALLELISM_THRESHOLD: usize = 4;

@@ -1,12 +1,11 @@
 use super::TestTask;
 use threadpool::*;
-use std::{
-    sync::mpsc::channel,
-    collections::*,
-};
+use std::sync::mpsc::channel;
 
 /// A somewhat better solution which uses `threadpool` and `std::sync::mpsc::channel` and fixes
 /// some other inefficiencies.
+/// If "fun" feature is enabled there's also some unsafe and unstable stuff being used to avoid
+/// a few unnecessary allocations.
 struct BetterTestTaskSolution;
 
 impl TestTask for BetterTestTaskSolution {
@@ -56,15 +55,40 @@ impl TestTask for BetterTestTaskSolution {
 
         drop(tx);
 
-        let res_map = rx.iter().collect::<BTreeMap<_, _>>();
+        #[cfg(feature = "fun")]
+        {
+            // Only one allocation for the result `Vec`
+            let mut res = Vec::with_capacity(n_tasks);
+            // requires #![feature(vec_spare_capacity)]
+            let spare_res = res.spare_capacity_mut();
 
-        let mut res = Vec::with_capacity(n_tasks);
+            for (start, r_data) in rx {
+                for (r, i) in r_data.into_iter().zip(start..) {
+                    // requires #![feature(maybe_uninit_extra)]
+                    spare_res[i].write(r);
+                }
+            }
 
-        for (_, mut r_data) in res_map {
-            res.append(&mut r_data)
+            unsafe {
+                res.set_len(n_tasks)
+            }
+
+            return res;
         }
 
-        res
+        #[cfg(not(feature = "fun"))]
+        {
+            // Additional allocations for the `BTreeMap`
+            let res_map = rx.iter().collect::<std::collections::BTreeMap<_, _>>();
+
+            let mut res = Vec::with_capacity(n_tasks);
+
+            for (_, mut r_data) in res_map {
+                res.append(&mut r_data)
+            }
+
+            return res;
+        }
     }
 }
 
