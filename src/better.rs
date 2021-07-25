@@ -42,6 +42,10 @@ impl TestTask for BetterTestTaskSolution {
             n_handled_tasks += n_cur_tasks;
             let cur_data = data.split_off(n_tasks - n_handled_tasks);
 
+            if cur_data.is_empty() {
+                break
+            }
+
             let tx = tx.clone();
             pool.execute(move ||
                 tx
